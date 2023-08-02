@@ -26,7 +26,7 @@ public class State
 
   float visDist = 10.0f;
   float visAngle = 30.0f;
-  float fleeAngle = 150f;
+  float fleeAngle = 30.0f;
   float shootDist = 7.0f;
   float fleeDist = 2.0f;
 
@@ -81,7 +81,7 @@ public class State
 
   public bool CanFlee()
   {
-    Vector3 direction = player.position - npc.transform.position;
+    Vector3 direction = npc.transform.position - player.position;
     float angle = Vector3.Angle(direction, npc.transform.forward);
     if (direction.magnitude < fleeDist && angle < fleeAngle)
     {
@@ -108,11 +108,6 @@ public class Idle : State
     if (CanSeePlayer())
     {
       nextState = new Pursue(npc, agent, anim, player);
-      stage = EVENT.EXIT;
-    }
-    if (CanFlee())
-    {
-      nextState = new Flee(npc, agent, anim, player);
       stage = EVENT.EXIT;
     }
     else if (UnityEngine.Random.Range(0, 100) < 10)
@@ -177,7 +172,7 @@ public class Patrol : State
       nextState = new Pursue(npc, agent, anim, player);
       stage = EVENT.EXIT;
     }
-    if (CanFlee())
+    else if (CanFlee())
     {
       nextState = new Flee(npc, agent, anim, player);
       stage = EVENT.EXIT;
@@ -268,63 +263,31 @@ public class Attack : State
 }
 public class Flee : State
 {
-  int currentIndex = -1;
-  Transform safeSpot;
   public Flee(GameObject _npc, NavMeshAgent _agent, Animator _anim, Transform _player) : base(_npc, _agent, _anim, _player)
   {
     name = STATE.FLEE;
-    agent.speed = 5;
-    agent.isStopped = false;
-    safeSpot = GameObject.FindGameObjectWithTag("Safe Spot").transform;
   }
 
   public override void Enter()
   {
-    float lastDist = Mathf.Infinity;
-    for (int i = 0; i < GameEnvironment.Singleton.Checkpoints.Count; i++)
-    {
-      GameObject thisWP = GameEnvironment.Singleton.Checkpoints[i];
-      float distance = Vector3.Distance(npc.transform.position, thisWP.transform.position);
-      if (distance < lastDist)
-      {
-        currentIndex = i - 1;
-        lastDist = distance;
-      }
-    }
     anim.SetTrigger("isRunning");
+    agent.isStopped = false;
+    agent.speed = 6;
+    agent.SetDestination(GameEnvironment.Singleton.safeSpot.position);
     base.Enter();
   }
 
   public override void Update()
   {
-    float distanceToSafeSpot = Vector3.Distance(npc.transform.position, safeSpot.position);
-    if (distanceToSafeSpot > 2)
+    if(agent.remainingDistance < 1)
     {
-      nextState = new Flee(npc, agent, anim, player);
-      agent.SetDestination(safeSpot.position);
-      stage = EVENT.EXIT;
-    }
-    else
-    {
-      nextState = new Patrol(npc, agent, anim, player);
-      if (agent.remainingDistance < 1)
-      {
-        if (currentIndex >= GameEnvironment.Singleton.Checkpoints.Count - 1)
-        {
-          currentIndex = 0;
-        }
-        else
-        {
-          currentIndex++;
-        }
-        agent.SetDestination(GameEnvironment.Singleton.Checkpoints[currentIndex].transform.position);
-      }
-      anim.ResetTrigger("isRunning");
+      nextState = new Idle(npc, agent, anim, player);
       stage = EVENT.EXIT;
     }
   }
   public override void Exit()
   {
+    anim.ResetTrigger("isRunning");
     base.Exit();
   }
 }
